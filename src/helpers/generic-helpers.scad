@@ -185,12 +185,22 @@ function foreach_add(list, to_add) =
     [for (item = list) item + to_add];
 
     
-// list/Vector helper function:
-// this will return the scalar value from a list (l) indicated (by index), use the last value in the list if the index would go past the end of the list, or return the scalar value of (l) if it is not a list
-// this function allows elegantly using parameters passed as scalar values, or as lists of scalar values
-// for example, a scale that applies equally to all axies, or a list with separate scales for each axis
-function valueOfListElementOrLast(l,index) = (index>=0)?(is_list(l)?((index<len(l))?l[index]:l[len(l)-1]):l):0; 
-    
+/**
+ * @brief convert scalar or list to a scalar by picking element from the list 
+ * @param l List or scalar value 
+ * @param index Indes of the list you want to retrieve, 0 is the default
+ * @details Accepts a list or a simple scalar value 'l' and returns the scalar or the index'th list element unless the index goes past the end of the list, then the list's last element's value is returned.
+ */
+function valueOfListElementOrLast(l,index=0) = (index>=0)?(is_list(l)?((index<len(l))?l[index]:l[len(l)-1]):l):0; 
+
+/**
+ * @brief convert scalar or list to a scalar by picking element from the list 
+ * @param l List or scalar value 
+ * @param index Indes of the list you want to retrieve, 0 is the default
+ * @param value the Default value if l is a list but index goes past the end of the list
+ * @details Accepts a list or a simple scalar value 'l' and returns the scalar or the index'th list element unless the index goes past the end of the list, then the default 'value' is returned.
+ */
+function valueOfListElementOrDefault(l, index=0, value=0) = is_num(l) ? l : index < len(l) ? l[index] : value;
     
 /**
  * @brief Create a rectangle with rounded corners by sweeping a 2d object along a path.

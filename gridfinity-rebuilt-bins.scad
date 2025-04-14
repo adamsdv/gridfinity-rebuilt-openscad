@@ -78,8 +78,10 @@ style_tab = 1; //[0:Full,1:Auto,2:Left,3:Center,4:Right,5:None]
 place_tab = 0; // [0:Everywhere-Normal,1:Top-Left Division]
 // how should the top lip act
 style_lip = 0; //[0: Regular lip, 1:remove lip subtractively, 2: remove lip and retain height]
-// scoop weight percentage. 0 disables scoop, 1 is regular scoop. Any real number will scale the scoop.
-scoop = 1; //[0:0.1:1]
+// front scoop weight percentage. 0 disables scoop, 1 is regular scoop. Any real number will scale the scoop.
+scoopF = 0; //[0:0.1:2]
+// back scoop weight percentage. 0 disables scoop, 1 is regular scoop. Any real number will scale the scoop.
+scoopB = 0; //[0:0.1:2]
 
 /* [Base Hole Options] */
 // only cut magnet/screw holes at the corners of the bin to save uneccesary print time
@@ -106,20 +108,22 @@ div_base_x = 1;
 div_base_y = 1;
 
 // ===== IMPLEMENTATION ===== //
+scoop = [scoopF,scoopB];
+
 
 color("tomato") {
-gridfinityInit(gridx, gridy, height(gridz, gridz_define, style_lip, enable_zsnap), height_internal, sl=style_lip) {
+    gridfinityInit(gridx, gridy, height(gridz, gridz_define, style_lip, enable_zsnap), height_internal, sl=style_lip) {
 
-    if (divx > 0 && divy > 0) {
+        if (divx > 0 && divy > 0) {
 
-        cutEqual(n_divx = divx, n_divy = divy, style_tab = style_tab, scoop_weight = scoop, place_tab = place_tab);
+            cutEqual(n_divx = divx, n_divy = divy, style_tab = style_tab, scoop_weight = scoop, place_tab = place_tab);
 
-    } else if (cdivx > 0 && cdivy > 0) {
+        } else if (cdivx > 0 && cdivy > 0) {
 
-        cutCylinders(n_divx=cdivx, n_divy=cdivy, cylinder_diameter=cd, cylinder_height=ch, coutout_depth=c_depth, orientation=c_orientation, chamfer=c_chamfer);
+            cutCylinders(n_divx=cdivx, n_divy=cdivy, cylinder_diameter=cd, cylinder_height=ch, coutout_depth=c_depth, orientation=c_orientation, chamfer=c_chamfer);
+        }
     }
-}
-gridfinityBase([gridx, gridy], hole_options=hole_options, only_corners=only_corners, thumbscrew=enable_thumbscrew,min_base_div=[div_base_x,div_base_y]);
+    gridfinityBase([gridx, gridy], hole_options=hole_options, only_corners=only_corners, thumbscrew=enable_thumbscrew,min_base_div=[div_base_x,div_base_y]);
 }
 
 

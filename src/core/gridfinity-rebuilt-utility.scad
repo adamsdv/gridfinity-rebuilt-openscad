@@ -617,7 +617,8 @@ module block_cutter(x,y,w,h,t,s,tab_width=d_tabw,tab_height=d_tabh) {
     xlen = w*($gxx*l_grid+d_magic)/$gxx-d_div;
 
     height = $dh;
-    extent = (abs(s) > 0 && ycutfirst ? d_wall2-d_wall-d_clear : 0);
+    extent = (abs(valueOfListElementOrLast(s,0)) > 0 && ycutfirst ? d_wall2-d_wall-d_clear : 0);
+    extentB = (abs(valueOfListElementOrDefault(s,1,0)) > 0 && ycutlast ? d_wall2-d_wall-d_clear : 0);
     tab = (zsmall || t == 5) ? (ycutlast?v_len_lip:0) : v_len_tab;
     ang = (zsmall || t == 5) ? (ycutlast?v_ang_lip:0) : v_ang_tab;
     cut = (zsmall || t == 5) ? (ycutlast?v_cut_lip:0) : v_cut_tab;
@@ -628,10 +629,11 @@ module block_cutter(x,y,w,h,t,s,tab_width=d_tabw,tab_height=d_tabh) {
 
     if (!zsmall && xlen - tab_width > 4*r_f2 && (t != 0 && t != 5)) {
         fillet_cutter(3,"bisque")
+        translate([extentB,0,0])
         difference() {
             transform_tab(style, xlen, ((xcutfirst&&style==-1)||(xcutlast&&style==1))?v_cut_lip:0, tab_width)
-            translate([ycutlast?v_cut_lip:0,0])
-            profile_cutter(height-h_bot, ylen/2, s);
+            translate([ycutlast?v_cut_lip:0,-extentB])
+            profile_cutter(height-h_bot, ylen/2-extentB, s);
 
             if (xcutfirst)
             translate([0,0,(xlen/2-r_f2)-v_cut_lip])
@@ -646,11 +648,12 @@ module block_cutter(x,y,w,h,t,s,tab_width=d_tabw,tab_height=d_tabh) {
         difference() {
             transform_tab(style, xlen, ((xcutfirst&&style==-1)||(xcutlast&&style==1)?v_cut_lip:0), tab_width)
             difference() {
+                translate([extentB,0,0])
                 intersection() {
-                    profile_cutter(height-h_bot, ylen-extent, s);
+                    profile_cutter(height-h_bot, ylen-extent-extentB, s);
                     profile_cutter_tab(height-h_bot, v_len_tab, v_ang_tab);
                 }
-                if (ycutlast) profile_cutter_tab(height-h_bot, v_len_lip, 45);
+                if (ycutlast) profile_cutter_tab(height-h_bot, v_len_lip-extentB, 45);
             }
 
             if (xcutfirst)
@@ -678,12 +681,13 @@ module block_cutter(x,y,w,h,t,s,tab_width=d_tabw,tab_height=d_tabh) {
     difference() {
         transform_main(xlen)
         difference() {
-            profile_cutter(height-h_bot, ylen-extent, s);
+            translate([extentB,0,0])
+            profile_cutter(height-h_bot, ylen-extent-extentB, s);
 
             if (!((zsmall || t == 5) && !ycutlast))
             profile_cutter_tab(height-h_bot, tab, ang);
 
-            if (!(abs(s) > 0)&& y == 0)
+            if (!(abs(valueOfListElementOrLast(s,0)) > 0)&& y == 0)
             translate([ylen-extent,0,0])
             mirror([1,0,0])
             profile_cutter_tab(height-h_bot, v_len_lip, v_ang_lip);
@@ -731,33 +735,37 @@ module fillet_cutter(t = 0, c = "goldenrod") {
 }
 
 module profile_cutter(h, l, s) {
-    scoop = max(s*$dh/2-r_f2,0);
+scoopF=max(valueOfListElementOrLast(s,0)*h/2-r_f2,0);
+scoopB=max(valueOfListElementOrLast(s,1)*h/2-r_f2,0);
+
     translate([r_f2,r_f2])
     hull() {
-        if (l-scoop-2*r_f2 > 0)
-            square(0.1);
-        if (scoop < h) {
-            translate([l-2*r_f2,h-r_f2/2])
-            mirror([1,1])
-            square(0.1);
-
-            translate([0,h-r_f2/2])
-            mirror([0,1])
-            square(0.1);
-        }
-        difference() {
-            translate([l-scoop-2*r_f2, scoop])
-            if (scoop != 0) {
+        intersection() {
+            square([l-2*r_f2,h-.5*r_f2]);
+            
+            if(scoopF>0) {
+            translate([l-scoopF-r_f2*2,scoopF])
+                union() {
                 intersection() {
-                    circle(scoop);
-                    mirror([0,1]) square(2*scoop);
+                    circle(scoopF);
+                    mirror([0,1])square(2*scoopF);
                 }
-            } else mirror([1,0]) square(0.1);
-            translate([l-scoop-2*r_f2,-1])
-            square([-(l-scoop-2*r_f2),2*h]);
-
-            translate([0,h])
-            square([2*l,scoop]);
+                translate([0,-scoopF])mirror([1,0])square([l,h]);
+                translate([scoopF,0])mirror([1,0])square([l,h]);
+                }
+            }
+            
+            if(scoopB>0) {
+            translate([scoopB,scoopB])
+                union() {
+                intersection() {
+                    circle(scoopB);
+                    mirror([1,1])square(2*scoopB);
+                }
+                translate([0,-scoopB])square([l,h]);
+                translate([-scoopB,0])square([l,h]);
+                }
+            }
         }
     }
 }
