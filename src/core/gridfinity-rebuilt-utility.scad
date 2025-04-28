@@ -246,7 +246,8 @@ module cut_move(x, y, w, h) {
  * @param grid_dimensions [length, width] of a single Gridfinity base.
  * @param thumbscrew Enable "gridfinity-refined" thumbscrew hole in the center of each base unit. This is a ISO Metric Profile, 15.0mm size, M15x1.5 designation.
  */
-module gridfinityBase(grid_size, grid_dimensions=GRID_DIMENSIONS_MM, hole_options=bundle_hole_options(), off=0, final_cut=true, only_corners=false, thumbscrew=false) {
+module gridfinityBase(grid_size, grid_dimensions=GRID_DIMENSIONS_MM, hole_options=bundle_hole_options(), off=0, final_cut=true, only_corners=false, thumbscrew=false,min_base_div=[1,1]) {
+
     assert(is_list(grid_dimensions) && len(grid_dimensions) == 2 &&
         grid_dimensions.x > 0 && grid_dimensions.y > 0);
     assert(is_list(grid_size) && len(grid_size) == 2 &&
@@ -256,7 +257,7 @@ module gridfinityBase(grid_size, grid_dimensions=GRID_DIMENSIONS_MM, hole_option
         is_bool(only_corners) &&
         is_bool(thumbscrew)
     );
-
+    
     // Per spec, there's a 0.5mm gap between each base.
     // This must be kept constant or half bins may not work correctly.
     gap_mm = GRID_DIMENSIONS_MM - BASE_TOP_DIMENSIONS;
@@ -267,8 +268,17 @@ module gridfinityBase(grid_size, grid_dimensions=GRID_DIMENSIONS_MM, hole_option
     dbnxt = [for (i=[1,2,4]) if (abs(grid_size.x*i)%1 < 0.001 || abs(grid_size.x*i)%1 > 0.999) i];
     dbnyt = [for (i=[1,2,4]) if (abs(grid_size.y*i)%1 < 0.001 || abs(grid_size.y*i)%1 > 0.999) i];
     assert(len(dbnxt) > 0 && len(dbnyt) > 0, "Base only supports half and quarter grid spacing.");
-    divisions_per_grid = [dbnxt[0], dbnyt[0]];
 
+    // passed min grid X divisions // min_base_div (if it is a scalar, or min_base_div.x or 1 if value is not a scalar (limited to max of 4)
+    min_base_div_x = (is_num(min_base_div)?((min_base_div<=4)?min_base_div:1):((is_list(min_base_div)&&len(min_base_div)>=1)?((min_base_div.x<=4)?min_base_div.x:1 ):1));
+    
+    // passed min grid Y divisions // min_base_div (if it is a scalar, or min_base_div.y or 1 if value is not a scalar (limited to max of 4)
+    min_base_div_y = (is_num(min_base_div)?((min_base_div<=4)?min_base_div:1):((is_list(min_base_div)&&len(min_base_div)>=2)?((min_base_div.y<=4)?min_base_div.y:1):1));
+        
+    //divisions_per_grid = [dbnxt[0], dbnyt[0]];
+    divisions_per_grid = [max(dbnxt[0],min_base_div_x), max(dbnyt[0],min_base_div_y)];
+
+        
     // Final size in number of bases
     final_grid_size = [grid_size.x * divisions_per_grid.x, grid_size.y * divisions_per_grid.y];
 
