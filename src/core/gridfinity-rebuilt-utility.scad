@@ -146,7 +146,9 @@ module cutCylinders(n_divx=1, n_divy=1, cylinder_diameter=1, cylinder_height=1, 
  * @param fill_height Height of the solid which fills a bin.  Set to 0 for automatic.
  * @param grid_dimensions [length, width] of a single Gridfinity base.
  */
-module gridfinityInit(gx, gy, h, fill_height = 0, grid_dimensions = GRID_DIMENSIONS_MM, sl = 0) {
+module gridfinityInit(gx, gy, h, fill_height = 0, grid_dimensions = GRID_DIMENSIONS_MM, sl = 0, notchDiv = [1,1]) {
+    
+    echo("GFI");
     $gxx = gx;
     $gyy = gy;
     $dh = h;
@@ -154,6 +156,8 @@ module gridfinityInit(gx, gy, h, fill_height = 0, grid_dimensions = GRID_DIMENSI
     $style_lip = sl;
 
     fill_height_real = fill_height != 0 ? fill_height : h - STACKING_LIP_SUPPORT_HEIGHT;
+
+    echo("GD = ",grid_dimensions," lst=",[45,47]);
     grid_size_mm = [gx * grid_dimensions.x, gy * grid_dimensions.y];
 
     // Inner Fill
@@ -172,10 +176,36 @@ module gridfinityInit(gx, gy, h, fill_height = 0, grid_dimensions = GRID_DIMENSI
     translate([0, 0, BASE_HEIGHT])
     //todo: Remove these constants
     sweep_rounded(foreach_add(grid_size_mm, -2*BASE_TOP_RADIUS-0.5-0.001)) {
-        if ($style_lip == 0) {
+        if ($style_lip == 0 || $style_lip == 3) {
             profile_wall(h);
         } else {
             profile_wall2(h);
+        }
+    }
+    if($style_lip == 3) {
+        xFactor = is_num(notchDiv) ? (notchDiv >= 0 && notchDiv <= 4 ? notchDiv : 1) : is_list(notchDiv) && len(notchDiv) > 0 ? (notchDiv[0] >= 0 && notchDiv[0] <= 4 ? notchDiv[0] : 1) :0;
+        
+        
+        yFactor =  is_num(notchDiv) ? (notchDiv >= 0 && notchDiv <= 4 ? notchDiv : 1) : is_list(notchDiv) && len(notchDiv) > 0 ? ( len(notchDiv) > 1 ? (notchDiv[1] >= 0 && notchDiv[1] <= 4 ? notchDiv[1] : 1) : (notchDiv[0] >= 0 && notchDiv[0] <= 4 ? notchDiv[0] : 1)) : 0;
+
+        echo("XFactor = ",xFactor);
+        color("lemonchiffon")
+        
+        if(xFactor>0) {
+            pattern_linear(gx*xFactor-1,1,grid_dimensions.x/xFactor,0) {
+                translate([0,grid_dimensions.y*gy/2-d_clear,h+BASE_HEIGHT])
+                lipNotch();
+                translate([0,-grid_dimensions.y*gy/2+d_clear,h+BASE_HEIGHT])
+                rotate([0,0,180]) lipNotch();
+            }
+        }
+        if(yFactor>0) {
+            pattern_linear(1,gy*yFactor-1,0,grid_dimensions.y/yFactor) {
+                translate([grid_dimensions.x*gx/2-d_clear,0,h+BASE_HEIGHT])
+                rotate([0,0,270])lipNotch();
+                translate([-grid_dimensions.x*gx/2+d_clear,0,h+BASE_HEIGHT])
+                rotate([0,0,90])lipNotch();
+            }
         }
     }
 }
@@ -190,12 +220,21 @@ module gridfinityInit(gx, gy, h, fill_height = 0, grid_dimensions = GRID_DIMENSI
 //      alignment only matters if the compartment size is larger than d_tabw
 //      0:full, 1:auto, 2:left, 3:center, 4:right, 5:none
 //      Automatic alignment will use left tabs for bins on the left edge, right tabs for bins on the right edge, and center tabs everywhere else.
-// s:   toggle the rounded back corner that allows for easy removal
+// s:   toggle the rounded back corner that allows for easy removal 
+//      this is actually a float (0 or 1 are typical values but it can be 0 to 2 in most cases for more or less scoop
+//      this may also be passed as a vector with 2 values, 
+//          the first is the standard 'back' scoop weight, 
+//          the second is the 'front' scoop weight (on the side where a 'tab' is placed if so configured)
+// tab_width:  maximum width of the label along bin X axis     
+// tab_height: maximum height of the label along bin Y axis
+//
+// now you can pass 'undef' for 't', 's', 'tab_width' or 'tab_height' and they will use default values
+// this is useful for passing parameters which may be changed by the customizer or other logic
 
 module cut(x=0, y=0, w=1, h=1, t=1, s=1, tab_width=d_tabw, tab_height=d_tabh) {
     translate([0, 0, -$dh - BASE_HEIGHT])
     cut_move(x,y,w,h)
-    block_cutter(clp(x,0,$gxx), clp(y,0,$gyy), clp(w,0,$gxx-x), clp(h,0,$gyy-y), t, s, tab_width, tab_height);
+        block_cutter(clp(x,0,$gxx), clp(y,0,$gyy), clp(w,0,$gxx-x), clp(h,0,$gyy-y), t=(t==undef)?1:t, s=(s==undef)?1:s, tab_width=(tab_width==undef)?d_tabw:tab_width, tab_height=(tab_height==undef)?d_tabh:tab_height);
 }
 
 
@@ -246,7 +285,8 @@ module cut_move(x, y, w, h) {
  * @param grid_dimensions [length, width] of a single Gridfinity base.
  * @param thumbscrew Enable "gridfinity-refined" thumbscrew hole in the center of each base unit. This is a ISO Metric Profile, 15.0mm size, M15x1.5 designation.
  */
-module gridfinityBase(grid_size, grid_dimensions=GRID_DIMENSIONS_MM, hole_options=bundle_hole_options(), off=0, final_cut=true, only_corners=false, thumbscrew=false) {
+module gridfinityBase(grid_size, grid_dimensions=GRID_DIMENSIONS_MM, hole_options=bundle_hole_options(), off=0, final_cut=true, only_corners=false, thumbscrew=false,min_base_div=[1,1]) {
+
     assert(is_list(grid_dimensions) && len(grid_dimensions) == 2 &&
         grid_dimensions.x > 0 && grid_dimensions.y > 0);
     assert(is_list(grid_size) && len(grid_size) == 2 &&
@@ -256,7 +296,7 @@ module gridfinityBase(grid_size, grid_dimensions=GRID_DIMENSIONS_MM, hole_option
         is_bool(only_corners) &&
         is_bool(thumbscrew)
     );
-
+    
     // Per spec, there's a 0.5mm gap between each base.
     // This must be kept constant or half bins may not work correctly.
     gap_mm = GRID_DIMENSIONS_MM - BASE_TOP_DIMENSIONS;
@@ -267,8 +307,17 @@ module gridfinityBase(grid_size, grid_dimensions=GRID_DIMENSIONS_MM, hole_option
     dbnxt = [for (i=[1,2,4]) if (abs(grid_size.x*i)%1 < 0.001 || abs(grid_size.x*i)%1 > 0.999) i];
     dbnyt = [for (i=[1,2,4]) if (abs(grid_size.y*i)%1 < 0.001 || abs(grid_size.y*i)%1 > 0.999) i];
     assert(len(dbnxt) > 0 && len(dbnyt) > 0, "Base only supports half and quarter grid spacing.");
-    divisions_per_grid = [dbnxt[0], dbnyt[0]];
 
+    // passed min grid X divisions // min_base_div (if it is a scalar, or min_base_div.x or 1 if value is not a scalar (limited to max of 4)
+    min_base_div_x = (is_num(min_base_div)?((min_base_div<=4)?min_base_div:1):((is_list(min_base_div)&&len(min_base_div)>=1)?((min_base_div.x<=4)?min_base_div.x:1 ):1));
+    
+    // passed min grid Y divisions // min_base_div (if it is a scalar, or min_base_div.y or 1 if value is not a scalar (limited to max of 4)
+    min_base_div_y = (is_num(min_base_div)?((min_base_div<=4)?min_base_div:1):((is_list(min_base_div)&&len(min_base_div)>=2)?((min_base_div.y<=4)?min_base_div.y:1):1));
+        
+    //divisions_per_grid = [dbnxt[0], dbnyt[0]];
+    divisions_per_grid = [max(dbnxt[0],min_base_div_x), max(dbnyt[0],min_base_div_y)];
+
+        
     // Final size in number of bases
     final_grid_size = [grid_size.x * divisions_per_grid.x, grid_size.y * divisions_per_grid.y];
 
@@ -288,13 +337,17 @@ module gridfinityBase(grid_size, grid_dimensions=GRID_DIMENSIONS_MM, hole_option
         rounded_square([grid_size_mm.x, grid_size_mm.y, h_bot], BASE_TOP_RADIUS, center=true);
     }
 
-    if(only_corners) {
+    max_base_divs = max(min_base_div);
+    // if refined hole & subdiv>1, or mag hole & subdiv>1, or screwHole & subdiv>2
+    force_only_corners = (hole_options[0] && max_base_divs>1) || (hole_options[1] && max_base_divs>1) || (hole_options[2] && max_base_divs>2);
+    
+    if(only_corners || force_only_corners) {
         difference(){
             pattern_linear(final_grid_size.x, final_grid_size.y, base_center_distance_mm.x, base_center_distance_mm.y) {
                 base_solid(individual_base_size_mm);
             }
 
-            if(thumbscrew) {
+            if(thumbscrew && (max_base_divs<=2)) {
                 thumbscrew_position = grid_size_mm - individual_base_size_mm;
                 pattern_linear(2, 2, thumbscrew_position.x, thumbscrew_position.y) {
                     _base_thumbscrew();
@@ -307,7 +360,7 @@ module gridfinityBase(grid_size, grid_dimensions=GRID_DIMENSIONS_MM, hole_option
     }
     else {
         pattern_linear(final_grid_size.x, final_grid_size.y, base_center_distance_mm.x, base_center_distance_mm.y)
-        block_base(hole_options, off, individual_base_size_mm, thumbscrew=thumbscrew);
+        block_base(hole_options, off, individual_base_size_mm, thumbscrew=thumbscrew, max_base_div=max_base_divs);
     }
 }
 
@@ -320,12 +373,16 @@ module gridfinityBase(grid_size, grid_dimensions=GRID_DIMENSIONS_MM, hole_option
  * @param hole_options @see block_base_hole.hole_options
  * @param only_corners Only put holes on each corner.
  */
-module gridfinity_base_lite(grid_size, wall_thickness, top_bottom_thickness, hole_options=bundle_hole_options(), only_corners = false) {
+module gridfinity_base_lite(grid_size, wall_thickness, top_bottom_thickness, hole_options=bundle_hole_options(), only_corners = false,min_base_div=[1,1]) {
     assert(is_list(grid_size) && len(grid_size) == 2 && grid_size.x > 0 && grid_size.y > 0);
     assert(is_num(wall_thickness) && wall_thickness > 0);
     assert(is_num(top_bottom_thickness) && top_bottom_thickness > 0);
     assert(is_bool(only_corners));
 
+    xFact=valueOrListElementWithDefault(min_base_div,0,1);
+    yFact=valueOrListElementWithDefault(min_base_div,1,1);
+    baseTopDims=[BASE_TOP_DIMENSIONS.x/xFact,BASE_TOP_DIMENSIONS.y/yFact];
+    
     grid_dimensions = GRID_DIMENSIONS_MM;
 
     // Per spec, there's a 0.5mm gap between each base.
@@ -336,21 +393,48 @@ module gridfinity_base_lite(grid_size, wall_thickness, top_bottom_thickness, hol
     // Gap needs to be removed to prevent an unwanted overhang off the edges.
     grid_size_mm = [grid_dimensions.x * grid_size.x, grid_dimensions.y * grid_size.y] -gap_mm;
 
-    //Bridging structure to tie the bases together
+//    //Bridging structure to tie the bases together
     difference() {
-        translate([0, 0, BASE_HEIGHT-top_bottom_thickness])
-        rounded_square([grid_size_mm.x, grid_size_mm.y, top_bottom_thickness], BASE_TOP_RADIUS, center=true);
-
-        pattern_linear(grid_size.x, grid_size.y, grid_dimensions.x, grid_dimensions.y)
+        translate([0, 0, BASE_HEIGHT])//-top_bottom_thickness])
+        difference() {
+            rounded_square([grid_size_mm.x, grid_size_mm.y, top_bottom_thickness], BASE_TOP_RADIUS, center=true);
+//            translate([0,grid_size_mm.y/2,0])rotate([45,0,0])cube(size=[grid_size_mm.x,sqrt(2)*top_bottom_thickness,sqrt(2)*top_bottom_thickness],center=true);
+//            translate([0,-grid_size_mm.y/2,0])rotate([45,0,0])cube(size=[grid_size_mm.x,sqrt(2)*top_bottom_thickness,sqrt(2)*top_bottom_thickness],center=true);
+//            translate([grid_size_mm.x/2,0,0])rotate([45,0,90])cube(size=[grid_size_mm.y,sqrt(2)*top_bottom_thickness,sqrt(2)*top_bottom_thickness],center=true);
+//            translate([-grid_size_mm.x/2,0,0])rotate([45,0,90])cube(size=[grid_size_mm.y,sqrt(2)*top_bottom_thickness,sqrt(2)*top_bottom_thickness],center=true);
+//            
+//            translate([grid_size_mm.x/2-BASE_TOP_RADIUS,grid_size_mm.y/2-BASE_TOP_RADIUS,0])
+//            difference() {
+//                cube(size=[BASE_TOP_RADIUS,BASE_TOP_RADIUS,top_bottom_thickness]);
+//                translate([0,0,-.001])cylinder(r1=BASE_TOP_RADIUS-top_bottom_thickness,r2=BASE_TOP_RADIUS,h=top_bottom_thickness+.002);
+//            }
+//            translate([-(grid_size_mm.x/2-BASE_TOP_RADIUS),grid_size_mm.y/2-BASE_TOP_RADIUS,0])
+//            rotate([0,0,90])difference() {
+//                cube(size=[BASE_TOP_RADIUS,BASE_TOP_RADIUS,top_bottom_thickness]);
+//                translate([0,0,-.001])cylinder(r1=BASE_TOP_RADIUS-top_bottom_thickness,r2=BASE_TOP_RADIUS,h=top_bottom_thickness+.002);
+//            }
+//            translate([-(grid_size_mm.x/2-BASE_TOP_RADIUS),-(grid_size_mm.y/2-BASE_TOP_RADIUS),0])
+//            rotate([0,0,180])difference() {
+//                cube(size=[BASE_TOP_RADIUS,BASE_TOP_RADIUS,top_bottom_thickness]);
+//                translate([0,0,-.001])cylinder(r1=BASE_TOP_RADIUS-top_bottom_thickness,r2=BASE_TOP_RADIUS,h=top_bottom_thickness+.002);
+//            }
+//            translate([(grid_size_mm.x/2-BASE_TOP_RADIUS),-(grid_size_mm.y/2-BASE_TOP_RADIUS),0])
+//            rotate([0,0,270])difference() {
+//                cube(size=[BASE_TOP_RADIUS,BASE_TOP_RADIUS,top_bottom_thickness]);
+//                translate([0,0,-.001])cylinder(r1=BASE_TOP_RADIUS-top_bottom_thickness,r2=BASE_TOP_RADIUS,h=top_bottom_thickness+.002);
+//            }
+        }
+        pattern_linear(grid_size.x*xFact, grid_size.y*yFact, grid_dimensions.x/xFact, grid_dimensions.y/yFact)
         translate([0, 0, top_bottom_thickness])
-        base_solid();
+        base_solid(top_dimensions=[BASE_TOP_DIMENSIONS.x/xFact,BASE_TOP_DIMENSIONS.y/yFact]);
     }
-
+    
+    
     render()
     if(only_corners) {
         difference() {
             union() {
-                pattern_linear(grid_size.x, grid_size.y, grid_dimensions.x, grid_dimensions.y)
+        pattern_linear(grid_size.x*xFact, grid_size.y*yFact, grid_dimensions.x/xFact, grid_dimensions.y/yFact)
                 base_outer_shell(wall_thickness, top_bottom_thickness);
                 _base_holes(hole_options, -wall_thickness, grid_size_mm);
             }
@@ -360,10 +444,11 @@ module gridfinity_base_lite(grid_size, wall_thickness, top_bottom_thickness, hol
         }
     }
     else {
-        pattern_linear(grid_size.x, grid_size.y, grid_dimensions.x, grid_dimensions.y) {
+            pattern_linear(grid_size.x*xFact, grid_size.y*yFact, grid_dimensions.x/xFact, grid_dimensions.y/yFact)
+            {
             difference() {
                 union() {
-                    base_outer_shell(wall_thickness, top_bottom_thickness);
+                    base_outer_shell(wall_thickness, top_bottom_thickness,top_dimensions=baseTopDims);
                     _base_holes(hole_options, -wall_thickness);
                 }
                 _base_holes(hole_options, 0);
@@ -454,7 +539,7 @@ module _base_holes(hole_options, offset=0, top_dimensions=BASE_TOP_DIMENSIONS) {
  * @param top_dimensions [x, y] size of a single base.  Only set if deviating from the standard!
  * @param thumbscrew Enable "gridfinity-refined" thumbscrew hole in the center of each base unit. This is a ISO Metric Profile, 15.0mm size, M15x1.5 designation.
  */
-module block_base(hole_options, offset=0, top_dimensions=BASE_TOP_DIMENSIONS, thumbscrew=false) {
+module block_base(hole_options, offset=0, top_dimensions=BASE_TOP_DIMENSIONS, thumbscrew=false,max_base_div = 1) {
     assert(is_list(top_dimensions) && len(top_dimensions) == 2);
     assert(is_bool(thumbscrew));
 
@@ -463,7 +548,7 @@ module block_base(hole_options, offset=0, top_dimensions=BASE_TOP_DIMENSIONS, th
     difference() {
         base_solid(top_dimensions);
 
-        if (thumbscrew) {
+        if (thumbscrew && max_base_div<=2) {
             _base_thumbscrew();
         }
         _base_holes(hole_options, offset, top_dimensions);
@@ -570,15 +655,20 @@ module stacking_lip_filleted() {
  * @brief External wall profile, with a stacking lip.
  * @details Translated so a 90 degree rotation produces the expected outside radius.
  */
+ // now uses intersection to assure proper profile even down to gridz=1
 module profile_wall(height_mm) {
     assert(is_num(height_mm))
-    translate([r_base - STACKING_LIP_SIZE.x, 0, 0]){
-        translate([0, height_mm, 0])
-        stacking_lip_filleted();
-        translate([STACKING_LIP_SIZE.x-d_wall, 0, 0])
-        square([d_wall, height_mm]);
+    intersection() {
+        translate([r_base - STACKING_LIP_SIZE.x, 0, 0]){
+            translate([0, height_mm, 0])
+            stacking_lip_filleted();
+            translate([STACKING_LIP_SIZE.x-d_wall, 0, 0])
+            square([d_wall, height_mm]);
+        }
+        square([10,10+height_mm]);
     }
 }
+
 
 // lipless profile
 module profile_wall2(height_mm) {
@@ -606,17 +696,18 @@ module block_cutter(x,y,w,h,t,s,tab_width=d_tabw,tab_height=d_tabh) {
     v_ang_tab = a_tab;
     v_ang_lip = 45;
 
-    ycutfirst = y == 0 && $style_lip == 0;
-    ycutlast = abs(y+h-$gyy)<0.001 && $style_lip == 0;
-    xcutfirst = x == 0 && $style_lip == 0;
-    xcutlast = abs(x+w-$gxx)<0.001 && $style_lip == 0;
+    ycutfirst = y == 0 && ($style_lip == 0 || $style_lip == 3);
+    ycutlast = abs(y+h-$gyy)<0.001 && ($style_lip == 0 || $style_lip == 3);
+    xcutfirst = x == 0 && ($style_lip == 0 || $style_lip == 3);
+    xcutlast = abs(x+w-$gxx)<0.001 && ($style_lip == 0 || $style_lip == 3);
     zsmall = ($dh+BASE_HEIGHT)/7 < 3;
 
     ylen = h*($gyy*l_grid+d_magic)/$gyy-d_div;
     xlen = w*($gxx*l_grid+d_magic)/$gxx-d_div;
 
     height = $dh;
-    extent = (abs(s) > 0 && ycutfirst ? d_wall2-d_wall-d_clear : 0);
+    extent = (abs(is_num(s)?s:s[0]) > 0 && ycutfirst ? d_wall2-d_wall-d_clear : 0);
+    extentB = (abs(is_num(s)?s:(len(s)>0?s[1]:0)) > 0 && ycutlast ? d_wall2-d_wall-d_clear : 0);
     tab = (zsmall || t == 5) ? (ycutlast?v_len_lip:0) : v_len_tab;
     ang = (zsmall || t == 5) ? (ycutlast?v_ang_lip:0) : v_ang_tab;
     cut = (zsmall || t == 5) ? (ycutlast?v_cut_lip:0) : v_cut_tab;
@@ -627,10 +718,11 @@ module block_cutter(x,y,w,h,t,s,tab_width=d_tabw,tab_height=d_tabh) {
 
     if (!zsmall && xlen - tab_width > 4*r_f2 && (t != 0 && t != 5)) {
         fillet_cutter(3,"bisque")
+        translate([extentB,0,0])
         difference() {
             transform_tab(style, xlen, ((xcutfirst&&style==-1)||(xcutlast&&style==1))?v_cut_lip:0, tab_width)
-            translate([ycutlast?v_cut_lip:0,0])
-            profile_cutter(height-h_bot, ylen/2, s);
+            translate([ycutlast?v_cut_lip:0,-extentB])
+            profile_cutter(height-h_bot, ylen/2-extentB, s);
 
             if (xcutfirst)
             translate([0,0,(xlen/2-r_f2)-v_cut_lip])
@@ -645,11 +737,12 @@ module block_cutter(x,y,w,h,t,s,tab_width=d_tabw,tab_height=d_tabh) {
         difference() {
             transform_tab(style, xlen, ((xcutfirst&&style==-1)||(xcutlast&&style==1)?v_cut_lip:0), tab_width)
             difference() {
+                translate([extentB,0,0])
                 intersection() {
-                    profile_cutter(height-h_bot, ylen-extent, s);
+                    profile_cutter(height-h_bot, ylen-extent-extentB, s);
                     profile_cutter_tab(height-h_bot, v_len_tab, v_ang_tab);
                 }
-                if (ycutlast) profile_cutter_tab(height-h_bot, v_len_lip, 45);
+                if (ycutlast) profile_cutter_tab(height-h_bot, v_len_lip-extentB, 45);
             }
 
             if (xcutfirst)
@@ -677,12 +770,13 @@ module block_cutter(x,y,w,h,t,s,tab_width=d_tabw,tab_height=d_tabh) {
     difference() {
         transform_main(xlen)
         difference() {
-            profile_cutter(height-h_bot, ylen-extent, s);
+            translate([extentB,0,0])
+            profile_cutter(height-h_bot, ylen-extent-extentB, s);
 
             if (!((zsmall || t == 5) && !ycutlast))
             profile_cutter_tab(height-h_bot, tab, ang);
 
-            if (!(abs(s) > 0)&& y == 0)
+            if (!(abs(is_num(s)?s:s[0]) > 0)&& y == 0)
             translate([ylen-extent,0,0])
             mirror([1,0,0])
             profile_cutter_tab(height-h_bot, v_len_lip, v_ang_lip);
@@ -730,33 +824,37 @@ module fillet_cutter(t = 0, c = "goldenrod") {
 }
 
 module profile_cutter(h, l, s) {
-    scoop = max(s*$dh/2-r_f2,0);
+scoopF=max((is_num(s)?s:s[0])*h/2-r_f2,0);
+scoopB=max((is_num(s)?s:(len(s)>1?s[1]:0))*h/2-r_f2,0);
+
     translate([r_f2,r_f2])
     hull() {
-        if (l-scoop-2*r_f2 > 0)
-            square(0.1);
-        if (scoop < h) {
-            translate([l-2*r_f2,h-r_f2/2])
-            mirror([1,1])
-            square(0.1);
-
-            translate([0,h-r_f2/2])
-            mirror([0,1])
-            square(0.1);
-        }
-        difference() {
-            translate([l-scoop-2*r_f2, scoop])
-            if (scoop != 0) {
+        intersection() {
+            square([l-2*r_f2,h-.5*r_f2]);
+            
+            if(scoopF>0) {
+            translate([l-scoopF-r_f2*2,scoopF])
+                union() {
                 intersection() {
-                    circle(scoop);
-                    mirror([0,1]) square(2*scoop);
+                    circle(scoopF);
+                    mirror([0,1])square(2*scoopF);
                 }
-            } else mirror([1,0]) square(0.1);
-            translate([l-scoop-2*r_f2,-1])
-            square([-(l-scoop-2*r_f2),2*h]);
-
-            translate([0,h])
-            square([2*l,scoop]);
+                translate([0,-scoopF])mirror([1,0])square([l,h]);
+                translate([scoopF,0])mirror([1,0])square([l,h]);
+                }
+            }
+            
+            if(scoopB>0) {
+            translate([scoopB,scoopB])
+                union() {
+                intersection() {
+                    circle(scoopB);
+                    mirror([1,1])square(2*scoopB);
+                }
+                translate([0,-scoopB])square([l,h]);
+                translate([-scoopB,0])square([l,h]);
+                }
+            }
         }
     }
 }
@@ -767,4 +865,29 @@ module profile_cutter_tab(h, tab, ang) {
         offset(delta = r_f2)
         polygon([[0,h],[tab,h],[0,h-tab*tan(ang)]]);
 
+}
+
+module lipNotch() {
+// this parameter is a complex calculation of the filleted .6mm radius top of the stacking lip used by gridfinity-rebuilt
+// rather than duplicate the calculation from parameters, I'm just copying the value directly here
+lipHeight=3.55147;
+//these parameters are not 'named' values in standard.scad but are there in STACKING_LIP_LINE
+lipBase = STACKING_LIP_LINE[1].x;             //0.7
+lipMidZ = STACKING_LIP_LINE[2].y - lipBase;  //1.8
+lipTop  = STACKING_LIP_LINE[3].x - lipBase;   //1.9
+
+    difference() {
+        union() {
+            translate([-r_base,-lipBase-1.9,0])cube([2*r_base,lipBase+1.9,lipHeight-STACKING_LIP_FILLET_RADIUS]);
+            translate([-r_base,-lipBase-1.9,0])cube([2*r_base,lipBase-1.9-STACKING_LIP_FILLET_RADIUS,lipHeight]);
+            translate([0,-STACKING_LIP_FILLET_RADIUS,lipHeight-STACKING_LIP_FILLET_RADIUS])rotate([0,90,0])cylinder(r=STACKING_LIP_FILLET_RADIUS,h=2*r_base,center=true);
+        }
+        translate([-r_base,-r_base,lipBase/2])cylinder(r1=0+(r_base-lipBase-lipTop),r2=r_base-lipTop,h=lipBase,center=true);
+        translate([-r_base,-r_base,lipBase+lipMidZ/2])cylinder(r1=r_base-lipTop,r2=r_base-lipTop,h=lipMidZ+0.01,center=true);
+        translate([-r_base,-r_base,lipBase+lipMidZ+lipTop/2])cylinder(r1=r_base-lipTop,r2=r_base,h=lipTop,center=true);
+
+        translate([r_base,-r_base,lipBase/2])cylinder(r1=0+(r_base-lipBase-lipTop),r2=r_base-lipTop,h=lipBase,center=true);
+        translate([r_base,-r_base,lipBase+lipMidZ/2])cylinder(r1=r_base-lipTop,r2=r_base-lipTop,h=lipMidZ+0.01,center=true);
+        translate([r_base,-r_base,lipBase+lipMidZ+lipTop/2])cylinder(r1=r_base-lipTop,r2=r_base,h=lipTop,center=true);
+    }
 }
