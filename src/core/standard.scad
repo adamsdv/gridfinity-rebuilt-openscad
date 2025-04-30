@@ -1,5 +1,4 @@
 
-
 // lower base chamfer "radius"
 r_c1 = 0.8;
 // bottom thiccness of bin

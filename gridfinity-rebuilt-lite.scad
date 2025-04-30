@@ -24,6 +24,9 @@ gridx = 3; //.5
 gridy = 3; //.5
 // bin height. See bin height information and "gridz_define" below.
 gridz = 6;
+/* [Base Minimum Divisions] */
+div_base_x = 1;//[1,2,3,4]
+div_base_y = 1;//[1,2,3,4]
 
 /* [Compartments] */
 // number of X Divisions
@@ -35,13 +38,21 @@ divy = 2;
 // snap gridz height to nearest 7mm increment
 enable_zsnap = false;
 // how should the top lip act
-style_lip = 0; //[0: Regular lip, 1:remove lip subtractively, 2: remove lip and retain height]
+style_lip = 0; //[0: Regular lip, 1:remove lip subtractively, 2: remove lip and retain height, 3: regular Lip with Notches]
+div_notch_x=1; //[0,1,2,3,4]
+div_notch_y=1; //[0,1,2,3,4]
+// front scoop weight percentage. 0 disables scoop, 1 is regular scoop. Any real number will scale the scoop. (>1 are extreme scoops but may have use)
+scoopF = 0; //[0:0.1:3]
+// back (tab side of bin) scoop weight percentage. 0 disables scoop, 1 is regular scoop. Any real number will scale the scoop.
+scoopB = 0; //[0:0.1:3]
 
 /* [Other] */
 // determine what the variable "gridz" applies to based on your use case
 gridz_define = 0; // [0:gridz is the height of bins in units of 7mm increments - Zack's method,1:gridz is the internal height in millimeters, 2:gridz is the overall external height of the bin in millimeters]
 // the type of tabs
 style_tab = 1; //[0:Full,1:Auto,2:Left,3:Center,4:Right,5:None]
+// which divisions have tabs
+place_tab = 1; // [0:Everywhere-Normal,1:Top-Left Division]
 
 /* [Base] */
 // thickness of bottom layer
@@ -66,19 +77,20 @@ printable_hole_top = true;
 hole_options = bundle_hole_options(refined_holes, magnet_holes, screw_holes, crush_ribs, chamfer_holes, printable_hole_top);
 
 // ===== IMPLEMENTATION ===== //
+scoop=[scoopF,scoopB];
+notchDiv = [div_notch_x,div_notch_y];
 
 // Input all the cutter types in here
 color("tomato")
 render()
-gridfinityLite(gridx, gridy, gridz, gridz_define, style_lip, enable_zsnap, l_grid, hole_options, only_corners) {
-    cutEqual(n_divx = divx, n_divy = divy, style_tab = style_tab, scoop_weight = 0);
+gridfinityLite(gridx, gridy, gridz, gridz_define, style_lip, enable_zsnap, GRID_DIMENSIONS_MM, hole_options, only_corners,min_base_div=[div_base_x,div_base_y]) {
+    //cutEqual(n_divx = divx, n_divy = divy, style_tab = style_tab, scoop_weight = scoop, place_tab = place_tab);
 }
 
 // ===== CONSTRUCTION ===== //
 
-module gridfinityLite(gridx, gridy, gridz, gridz_define, style_lip, enable_zsnap, length, style_hole, only_corners) {
+module gridfinityLite(gridx, gridy, gridz, gridz_define, style_lip, enable_zsnap, grid_dimensions, style_hole, only_corners,min_base_div=[1,1]) {
     height_mm = height(gridz, gridz_define, style_lip, enable_zsnap);
-
     // Lower the bin start point by this amount.
     // Made up for in bin height.
     // Ensures divider walls smoothly transition to the bottom
@@ -86,16 +98,19 @@ module gridfinityLite(gridx, gridy, gridz, gridz_define, style_lip, enable_zsnap
 
     difference() {
         translate([0, 0, -lower_by_mm])
-        gridfinityInit(gridx, gridy, height_mm+lower_by_mm, 0, length, sl=style_lip)
+        
+        gridfinityInit(gridx, gridy, height_mm+lower_by_mm, 0, grid_dimensions, sl=style_lip, notchDiv = notchDiv)
         children();
 
         // Underside of the base. Keep out zone.
         render()
         difference() {
-            cube([gridx*length, gridy*length, BASE_HEIGHT*2], center=true);
-            gridfinityBase([gridx, gridy], hole_options=style_hole, only_corners=only_corners);
+            cube([gridx*grid_dimensions.x, gridy*grid_dimensions.y, BASE_HEIGHT*2], center=true);
+            gridfinityBase([gridx, gridy], hole_options=style_hole, only_corners=only_corners,min_base_div=min_base_div);
         }
     }
 
-    gridfinity_base_lite([gridx, gridy], d_wall, bottom_layer, hole_options=style_hole, only_corners=only_corners);
+
+    gridfinity_base_lite([gridx, gridy], d_wall, bottom_layer, hole_options=style_hole, only_corners=only_corners,min_base_div=min_base_div);
 }
+

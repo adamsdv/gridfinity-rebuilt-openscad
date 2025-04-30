@@ -249,3 +249,56 @@ module sweep_rounded(size) {
         }
     }
 }
+
+
+//--------------DVA LIST AND VALUE FUNCTIONS--------------------
+/**
+ *
+ */
+ // this function compactly allows you to take a numeric or vector of numeric values parameter
+ // and then extract the value (as a scalar) if it was numeric or a numeric value in the vector.
+ // which value is selected is based upon the specified index
+ // if index exceeds the vector's length, then return the default value
+ // also if other errors exist (like non-scalar and vector with non-scalar number values) return the specified default.
+ 
+function valueOrListElementWithDefault(l, ix=0, def=0) =
+    is_num(l) ? l : // If l is a scalar (number), return it
+    is_list(l) && len(l) > ix ? l[ix] : // If l is a list and ix is in bounds, return l[ix]
+    def; // Otherwise, return the default value
+
+// this function is like the previous one, except that the case of exceeding the length of the specified vector input
+// will repeat the value of the vector's last entry
+function valueOrListElementWithRepeatLast(l, ix=0, def=0) =
+    is_num(l) ? l : // If l is a scalar (number), return it
+    is_list(l) ? 
+        (len(l) > 0 ? (len(l) > ix ? l[ix] : l[len(l)-1]) : def) : // If l is a non-empty list, return l[ix] if in bounds, else last element; if empty, return def
+    def; // Return def if l is neither a number nor a list
+
+// this one will return sequentially the values of the vector and will wrap around and repeat the vector values as index increases
+
+function valueOrListElementWithRepeatList(l, ix=0, def=0) =
+    is_num(l) ? l : // If l is a scalar (number), return it
+    is_list(l) ? 
+        (len(l) > 0 ? l[ix % len(l)] : def) : // If l is a non-empty list, return l[ix % len(l)] to repeat cyclically; if empty, return def
+    def; // Return def if l is neither a number nor a list
+
+    
+ // this funciton executes a summation of a list,  optional 'start' (which defaults ot 0) allows you to sum from a given index to the end 
+ function sumOfList(l, start=0) =
+    is_list(l) && len(l) > start ? // If l is a list and start is within bounds
+        l[start] + sumOfList(l, start+1) : // Add current element and recurse
+    0; // Return 0 for non-lists, empty lists, or when start reaches end
+    
+ // this function returns the sum of the first items of the passed list
+ function sumOfFirstItemsOfList(l, ct) =
+    is_num(l) ? (ct == 0 ? 0 : l) : // If scalar: return 0 if ct=0, l if ct>0
+    is_list(l) && ct > 0 && len(l) > 0 ? // If list, ct>0, and non-empty
+        l[0] + sumOfFirstItemsOfList(l, ct-1, 1) : // Add first element and recurse
+    0; // Base case: empty list, ct<=0, or invalid input
+    
+// this function will sum from the specified 'start' index entry of the vector to the specified index (NOT COUNT)    
+function sumOfFirstItemsOfList(l, ct, start=0) =
+    start >= len(l) || ct <= 0 ? 0 : // Stop if past list end or ct<=0
+    l[start] + sumOfFirstItemsOfList(l, ct-1, start+1); // Add element and recurse
+    
+
