@@ -73,17 +73,21 @@ function height (z,d=0,l=0,enable_zsnap=true) =
 // style_tab:   tab style for all compartments. see cut()
 // scoop_weight:    scoop toggle for all compartments. see cut()
 // place_tab:   tab suppression for all compartments. see "gridfinity-rebuilt-bins.scad"
-module cutEqual(n_divx=1, n_divy=1, style_tab=1, scoop_weight=1, place_tab=1) {
-    for (i = [1:n_divx])
+module cutEqual(n_divx=1, n_divy=1, style_tab=1, scoop_weight=1, place_tab=1, tab_width=d_tabw, tab_height=d_tabh) {
+    tab_w = (tab_width>=0)?tab_width:d_tabw;
+    tab_h = (tab_height>=0)?tab_height:d_tabh;
+
     for (j = [1:n_divy])
+    for (i = [1:n_divx])
     {
+        seqNum=(i-1)+(j-1)*n_divx;
         if (
             place_tab == 1 && (i != 1 || j != n_divy) // Top-Left Division
         ) {
-            cut((i-1)*$gxx/n_divx,(j-1)*$gyy/n_divy, $gxx/n_divx, $gyy/n_divy, 5, scoop_weight);
+            cut((i-1)*$gxx/n_divx,(j-1)*$gyy/n_divy, $gxx/n_divx, $gyy/n_divy, 5, scoop_weight,tab_width=tab_w,tab_height=tab_h);
         }
         else {
-            cut((i-1)*$gxx/n_divx,(j-1)*$gyy/n_divy, $gxx/n_divx, $gyy/n_divy, style_tab, scoop_weight);
+            cut((i-1)*$gxx/n_divx,(j-1)*$gyy/n_divy, $gxx/n_divx, $gyy/n_divy, valueOrListElementWithRepeatLast(style_tab,seqNum,1), scoop_weight,tab_width=tab_w,tab_height=tab_h);
         }
     }
 }
@@ -135,6 +139,118 @@ module cutCylinders(n_divx=1, n_divy=1, cylinder_diameter=1, cylinder_height=1, 
     }
 }
 
+// Creates variably divided cutters for the bin
+// this allows many additional customizations.
+// xDivs is a list of relative x-axis widths of the divisions
+// yDivs is a list of relative y-axis widths of the divisions
+// style_tab is the style of the tab used (it may be a list list of style_tabs providing a different value for each division)
+// scoop_weight is the weight factor use for front side scoop, a scalar means no 'back' scoop, providing a list allows seperately defined front-scoop & back-scoop weights
+// placeTab supports two styles [0:Everywhere-Normal,1:Top-Left Division only] // value 1 here overrides style_tab list selections
+// extraOuterWall can be a scalar (in mm) and will add roughly this amount to each of the 4 outer wall thicknesses, a list may be passed
+//                which will specify extra thickness for front, back, left and right walls individually.
+//                this allows you to only thicken walls which really need it, for example scoop strengthens a wall intrensically, also internal divisions might be enough
+// extraInnerWall is a scalar which increases (in mm) internal wall thickness (it is approximate)
+
+// this will attempt to allow extra outer wall space to be added to the bin and accomidate variable bin widths and lengths using an array of bin weights;
+
+// bin sequence numbers count from 0 in the lower-left corner, up to the lower-right corner, and repeat left-to-right
+
+module cutVariableDVA(xDivs,yDivs, style_tab=1, scoop_weight=1, place_tab=1 ,extraWall=0,extraInnerWall=0,extraDepth=0, tab_width=d_tabw, tab_height=d_tabh) {
+    n_divx=len(xDivs);
+    n_divy=len(yDivs);
+
+    totLenX=sumOfList(xDivs);
+    totWidY=sumOfList(yDivs);
+    
+    extraFrontWall = valueOrListElementWithDefault(extraWall,0,0);
+    extraBackWall = valueOrListElementWithDefault(extraWall,1,0);
+    extraLeftWall = valueOrListElementWithDefault(extraWall,2,0);
+    extraRightWall = valueOrListElementWithDefault(extraWall,3,0);
+    
+    tab_w = (tab_width>=0)?tab_width:d_tabw;
+    tab_h = (tab_height>=0)?tab_height:d_tabh;
+    
+// nothing has been done on this YET!!
+// these calculate in 'l_grid' modules, the space we have for X and Y divisions (with inner & outer walls removed)
+// This is not EXACT since the 'CUT' function' already accounts for default inner and outer wall thicknesses. but it is a pretty good estimate 
+    axx = $gxx-((extraLeftWall+extraRightWall)/GRID_DIMENSIONS_MM.x)-(extraInnerWall/GRID_DIMENSIONS_MM.x)*(n_divx-1);
+    ayy = $gyy-((extraFrontWall+extraBackWall)/GRID_DIMENSIONS_MM.y)-(extraInnerWall/GRID_DIMENSIONS_MM.y)*(n_divy-1);
+
+    echo("$gxx=",$gxx);
+    echo("$gyy=",$gyy);
+    echo("Extra Front Wall =",extraFrontWall);
+    echo("Extra Back Wall =",extraBackWall);
+    echo("Extra Left Wall =",extraLeftWall);
+    echo("Extra Right Wall =",extraRightWall);
+    echo("Extra Inner Wall =",extraInnerWall);
+    echo("axx=",axx);
+    echo("ayy=",ayy);
+
+    echo("TotalLengthX=",totLenX);
+    echo("TotalWidthY=",totWidY);
+    
+    topLeftSeq =(n_divy-1)*n_divx;
+    
+    for (j = [1:n_divy]) {
+        binWidthY=(yDivs[(j-1)])*ayy/totWidY;
+        binBotY=sumOfFirstItemsOfList(yDivs,j-1)*ayy/totWidY + (extraFrontWall/GRID_DIMENSIONS_MM.y) + ((extraInnerWall/GRID_DIMENSIONS_MM.y)*(j>1?(j-1):0));
+        echo("YW  [",j,"] =",binWidthY," @ ",binBotY);
+
+        for (i = [1:n_divx]) {
+            binLengthX=(xDivs[(i-1)])*axx/totLenX;
+            binLeftX=sumOfFirstItemsOfList(xDivs,i-1)*axx/totLenX + (extraLeftWall/GRID_DIMENSIONS_MM.x) + ((extraInnerWall/GRID_DIMENSIONS_MM.x)*(i>1?(i-1):0));
+            echo("XL  [",i,"] =",binLengthX," @ ",binLeftX);
+            
+            seqNum = (j-1)*n_divx + (i-1);
+            
+            thisTabStyle = valueOrListElementWithRepeatLast(style_tab,seqNum,1);
+            tabType = ((place_tab==1 && seqNum==topLeftSeq)||place_tab==0)?(thisTabStyle!=1?thisTabStyle:(i==1?2:(i==n_divx)?4:3)):5;
+            
+            echo("XYTT=",i,j,tabType);
+            cut(binLeftX,binBotY,binLengthX,binWidthY,tabType,scoop_weight,tab_width=tab_w,tab_height=tab_h);
+        }
+    }
+}
+
+//module pattern_grid(cx,cy,sx,sy,stx=0,sty=0,stxc=0,styc=0,hexGrid=0)
+
+module cutGridDVA(cx,cy,spaceX=10,spaceY=10,stx=0,sty=0,stxc=0,styc=0,hexGrid=0,depth=20,cut_depth=10,gridPocket=undef,extraWall=0) {
+//gridPocket = [grid_element,grid_dimension_1,grid_dimension_2,grid_dimension_3,grid_rotation,grid_bottom_rounding,grid_bottom_chamfer,grid_top_rounding,grid_top_chamfer];
+
+
+assert(gridPocket!=undef,"Error: gridPocket must be defined")
+assert(len(gridPocket)==9,"Error: gridPocket must have 9 elements");
+    
+    extraFrontWall = valueOrListElementWithDefault(extraWall,0,0);
+    extraBackWall = valueOrListElementWithDefault(extraWall,1,0);
+    extraLeftWall = valueOrListElementWithDefault(extraWall,2,0);
+    extraRightWall = valueOrListElementWithDefault(extraWall,3,0);
+
+    botCham = (gridPocket[6]>0)?gridPocket[6]:undef;
+    botRnd = (gridPocket[5]>0)?gridPocket[5]:undef;
+    topCham =  (gridPocket[8]<0)?gridPocket[8]:undef;
+    topRnd =  (gridPocket[7]<0)?gridPocket[7]:undef;
+
+
+    if(cut_depth>0) {
+    translate([0,0,$dh-h_bot-STACKING_LIP_SUPPORT_HEIGHT-cut_depth-.01])
+
+        cut(extraLeftWall/GRID_DIMENSIONS_MM.x,extraFrontWall/GRID_DIMENSIONS_MM.y,$gxx-((extraLeftWall+extraRightWall)/GRID_DIMENSIONS_MM.x),$gyy-((extraFrontWall+extraBackWall)/GRID_DIMENSIONS_MM.y),t=5,s=0);
+    }
+    translate([(extraLeftWall-extraRightWall)/2,(extraFrontWall-extraBackWall)/2,BASE_HEIGHT+$dh-STACKING_LIP_SUPPORT_HEIGHT-depth-cut_depth])
+    pattern_grid(cx,cy,spaceX,spaceY,stx,sty,stxc,styc,hexGrid) {
+        if(gridPocket[0]=="cylinder") {
+            //echo("Pocket Cyl=",gridPocket[1],depth,botCham,botRnd,topCham,topRnd," @ ",depth,cut_depth,$dh);
+            roundedCylinder(d=gridPocket[1],h=depth,chamfer1=botCham,chamfer2=topCham,rounding1=botRnd,rounding2=topRnd);
+        }
+        if(gridPocket[0]=="rectangular") {
+            rotate([0,0,gridPocket[4]])
+            roundedCube(size=[gridPocket[1],gridPocket[2],depth],edgeRadius=gridPocket[3],chamfer1=botCham,chamfer2=topCham,rounding1=botRnd,rounding2=topRnd);
+        }
+    }
+}
+
+
 /**
  * @Summary Initialize A Gridfinity Bin
  * @Details Creates the top portion of a bin, and sets some gloal variables.
@@ -147,8 +263,6 @@ module cutCylinders(n_divx=1, n_divy=1, cylinder_diameter=1, cylinder_height=1, 
  * @param grid_dimensions [length, width] of a single Gridfinity base.
  */
 module gridfinityInit(gx, gy, h, fill_height = 0, grid_dimensions = GRID_DIMENSIONS_MM, sl = 0, notchDiv = [1,1]) {
-    
-    echo("GFI");
     $gxx = gx;
     $gyy = gy;
     $dh = h;
@@ -157,7 +271,6 @@ module gridfinityInit(gx, gy, h, fill_height = 0, grid_dimensions = GRID_DIMENSI
 
     fill_height_real = fill_height != 0 ? fill_height : h - STACKING_LIP_SUPPORT_HEIGHT;
 
-    echo("GD = ",grid_dimensions," lst=",[45,47]);
     grid_size_mm = [gx * grid_dimensions.x, gy * grid_dimensions.y];
 
     // Inner Fill
@@ -232,6 +345,9 @@ module gridfinityInit(gx, gy, h, fill_height = 0, grid_dimensions = GRID_DIMENSI
 // this is useful for passing parameters which may be changed by the customizer or other logic
 
 module cut(x=0, y=0, w=1, h=1, t=1, s=1, tab_width=d_tabw, tab_height=d_tabh) {
+//echo("CUT=",x,y,w,h,t,s,tab_width,tab_height);
+
+
     translate([0, 0, -$dh - BASE_HEIGHT])
     cut_move(x,y,w,h)
         block_cutter(clp(x,0,$gxx), clp(y,0,$gyy), clp(w,0,$gxx-x), clp(h,0,$gyy-y), t=(t==undef)?1:t, s=(s==undef)?1:s, tab_width=(tab_width==undef)?d_tabw:tab_width, tab_height=(tab_height==undef)?d_tabh:tab_height);
@@ -717,21 +833,22 @@ module block_cutter(x,y,w,h,t,s,tab_width=d_tabw,tab_height=d_tabh) {
     rotate([90,0,-90]) {
 
     if (!zsmall && xlen - tab_width > 4*r_f2 && (t != 0 && t != 5)) {
-        fillet_cutter(3,"bisque")
-        translate([extentB,0,0])
-        difference() {
-            transform_tab(style, xlen, ((xcutfirst&&style==-1)||(xcutlast&&style==1))?v_cut_lip:0, tab_width)
-            translate([ycutlast?v_cut_lip:0,-extentB])
-            profile_cutter(height-h_bot, ylen/2-extentB, s);
-
-            if (xcutfirst)
-            translate([0,0,(xlen/2-r_f2)-v_cut_lip])
-            cube([ylen,height,v_cut_lip*2]);
-
-            if (xcutlast)
-            translate([0,0,-(xlen/2-r_f2)-v_cut_lip])
-            cube([ylen,height,v_cut_lip*2]);
-        }
+//    // this seems to not be necessary now with the double-scoop modification.
+//        fillet_cutter(3,"bisque")
+//        translate([extentB,0,0])
+//        difference() {
+//            transform_tab(style, xlen, ((xcutfirst&&style==-1)||(xcutlast&&style==1))?v_cut_lip:0, tab_width)
+//            translate([ycutlast?v_cut_lip:0,-extentB])
+//            profile_cutter(height-h_bot, ylen/2-extentB, s);
+//
+//            if (xcutfirst)
+//            translate([0,0,(xlen/2-r_f2)-v_cut_lip])
+//            cube([ylen,height,v_cut_lip*2]);
+//
+//            if (xcutlast)
+//            translate([0,0,-(xlen/2-r_f2)-v_cut_lip])
+//            cube([ylen,height,v_cut_lip*2]);
+//        }
         if (t != 0 && t != 5)
         fillet_cutter(2,"indigo")
         difference() {
