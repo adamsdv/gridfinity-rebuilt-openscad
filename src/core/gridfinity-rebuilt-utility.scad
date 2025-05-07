@@ -247,6 +247,10 @@ assert(len(gridPocket)==9,"Error: gridPocket must have 9 elements");
             rotate([0,0,gridPocket[4]])
             roundedCube(size=[gridPocket[1],gridPocket[2],depth],edgeRadius=gridPocket[3],chamfer1=botCham,chamfer2=topCham,rounding1=botRnd,rounding2=topRnd);
         }
+        if(gridPocket[0]=="hex") {
+            rotate([0,0,gridPocket[4]])
+            roundedHex(f=gridPocket[1],h=depth,edgeRadius=gridPocket[3],chamfer1=botCham,chamfer2=topCham,rounding1=botRnd,rounding2=topRnd);
+        }
     }
 }
 

@@ -98,7 +98,7 @@ build_variable_alternate=false; //[false]
 /* [Variable Compartments - deluxe] */
 build_variable_deluxe=false; //[false]
 
-/* [Grid Compartments] */
+/* [Grid of Compartments] */
 build_grid=false; //[false,true]
 grid_count_x = 5;//[1:100]
 grid_count_y = 5;//[1:100]
@@ -115,7 +115,8 @@ grid_depth=10;
 // how deep to make each pocket
 
 
-grid_element="cylinder"; //[cylinder, rectangular]
+/* [the Grid Compartments] */
+grid_element="cylinder"; //[cylinder, rectangular, hex]
 // primary dimension for a pocket (x-axis or diameter)
 grid_dimension_1=20;
 // secondary dimension for a pocket (y-axis)
