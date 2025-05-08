@@ -1,6 +1,29 @@
-# Gridfinity Rebuilt in OpenSCAD
+# Gridfinity Rebuilt in OpenSCAD (adamsdv fork)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+## This fork
+
+This is {hopefully} a temporary fork of [gridfinity](https://www.youtube.com/watch?v=ra_9zU-mnl8)
+It is home to solutions to numerous open issues & feature requests
+Here are the hilights:
+1. gridfinity-rebuilt-bins-adv.scad is added to provide access to all these customization features, some are available in gridfinity-rebuilt-bins.scad
+2. Scoop can now be defined on the front and/or back of bins (independently)
+3. The base can be sub-divided by 1,2,3 or 4, independently for X and Y axis.  Higher divisors are not realizable
+4. The stacking lip has a new style which integrates 'notches'.  These can be spaced independently on each axis (with divisors 1,2,3 or 4), or eliminated.
+5. Outer walls can be thickened, all 4 are independently adjustable
+6. The interior divider wall between pockets can be thickened
+7. A variable linear compartment mode allows X and Y divisions to be adjusted in the customizer by entering a list of relative sizes in a CSV string
+8. A customizer setting to create a bin with a grid of cavities (cylindrical, rectangular or hexagonal) The grid can be a rectangular array or have staggered rows or columns
+9. Tabs can be individually specified with a list of values entered as a CSV string
+10. Tab width and heights can be adjusted
+11. A single cavity can be sunk down into the bin with any wall offset (a single value currently), this is an easy way to cut dividers down to a lower level
+12. A fix to properly form the bin wall when it is a at a grid-z height of 1 unit
+13. A mechanism to easily explore the bin construction using slicing planes that are controlled in the customizer
+
+Many of these changes are already placed as Pull-Requests in the origin project, but are moving slowly and with uncertain reception as implemented.  So I'm maintaining this Fork with the main branch being my latest revisions.  More documents and examples of what you can do with these features (using the customizer) will be added soon.
+
+## The original repository [gridfinity](https://www.youtube.com/watch?v=ra_9zU-mnl8)
 
 A ground-up port (with a few extra features) of the stock [gridfinity](https://www.youtube.com/watch?v=ra_9zU-mnl8) bins in OpenSCAD. Open to feedback, because I could not feasibly test all combinations of bins. I tried my best to exactly match the original gridfinity dimensions, but some of the geometry is slightly incorrect (mainly fillets). However, I think they are negligible differences, and will not appear in the printed model.
 
