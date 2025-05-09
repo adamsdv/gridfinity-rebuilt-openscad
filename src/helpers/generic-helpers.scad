@@ -531,158 +531,179 @@ assert(!((stxc==-1 && stx<1)||(stxc==1 && stx>=0)),"This staggerX and staggerXCo
     }
 }
 
+
 // 3-D geometry Centered at X,Y=0,0 with the base at Z=0 and extending to the positive Z axis
 // this cylinder can have rounded or chamfered top and bottom (chamfer and rounding can positive or negative values
 
-module roundedCylinder(r=undef, h=undef, d=undef, chamfer=undef, chamfer1=undef, chamfer2=undef, rounding=undef, rounding1=undef, rounding2=undef) {
-    // Validate input parameters
-    assert(!(r == undef && d == undef), "Error: radius or diameter must be defined");
-    assert(h != undef, "Error: height (h) must be defined");
-    assert(!(r != undef && d != undef), "Error: do not define Radius and Diameter for same aspect");
+module roundedCylinder(r=undef,h=undef,d=undef,chamfer=undef,chamfer1=undef,chamfer2=undef,rounding=undef,rounding1=undef,rounding2=undef) {
+// assure that at least enought parameters are given,
+assert(!(r==undef && d==undef),"Error: radius or diameter must be defined");
+assert(h!=undef,"Error: height (h) must be defined");
+// assure that the parameters don't over-define 
+assert(!(r!=undef && d!=undef),"Error: do not define Radius and Diameter for same aspect");
+// assure that the parameters have possible values for reality
 
-    // Resolve radius
-    rad = r != undef ? r : d / 2;
 
-    // Resolve chamfer and rounding for bottom and top
-    cr1 = chamfer1 != undef ? chamfer1 : chamfer != undef ? chamfer : rounding1 != undef ? rounding1 : rounding != undef ? rounding : 0;
-    cr2 = chamfer2 != undef ? chamfer2 : chamfer != undef ? chamfer : rounding2 != undef ? rounding2 : rounding != undef ? rounding : 0;
+rad = (r!=undef)?r:(d!=undef)?(d/2):undef;
+//------------------
+cham1=(chamfer1!=undef)?chamfer1:(chamfer!=undef)?chamfer:undef;
+rnd1=(rounding1!=undef)?rounding1:(rounding!=undef)?rounding:undef;
 
-    // Validate chamfer/rounding overlap
-    assert((cr1 > 0 ? cr1 : 0) + (cr2 > 0 ? cr2 : 0) <= h, "Error: upper and lower chamfer/rounding can't overlap");
+cham2=(chamfer2!=undef)?chamfer2:(chamfer!=undef)?chamfer:undef;
+rnd2=(rounding2!=undef)?rounding2:(rounding!=undef)?rounding:undef;
 
+h1 = (cham1!=undef)?abs(cham1):(rnd1!=undef)?abs(rnd1):0;
+h2 = h-((cham2!=undef)?abs(cham2):(rnd2!=undef)?abs(rnd2):0);
+
+assert(h1<=h2,"Error: upper and lower chamfer/rounding can't overlap");
+    
     rotate_extrude(angle=360) {
         difference() {
             union() {
-                // Base rectangle for cylinder
-                polygon(points=[[0, 0], [rad, 0], [rad, h], [0, h]], paths=[[0, 1, 2, 3, 0]]);
-
-                // Negative chamfer/rounding (outward)
-                if (cr1 != 0 && cr1 < 0) {
-                    if (chamfer1 != undef || chamfer != undef) {
-                        polygon(points=[[rad, 0], [rad + abs(cr1), 0], [rad, abs(cr1)]], paths=[[0, 1, 2, 0]]);
-                    } else if (rounding1 != undef || rounding != undef) {
-                        difference() {
-                            translate([rad, 0]) square(size=[abs(cr1), abs(cr1)]);
-                            translate([rad + abs(cr1), abs(cr1)]) circle(r=abs(cr1));
-                        }
-                    }
-                }
-                if (cr2 != 0 && cr2 < 0) {
-                    if (chamfer2 != undef || chamfer != undef) {
-                        polygon(points=[[rad, h], [rad + abs(cr2), h], [rad, h - abs(cr2)]], paths=[[0, 1, 2, 0]]);
-                    } else if (rounding2 != undef || rounding != undef) {
-                        difference() {
-                            translate([rad, h - abs(cr2)]) square(size=[abs(cr2), abs(cr2)]);
-                            translate([rad + abs(cr2), h - abs(cr2)]) circle(r=abs(cr2));
-                        }
-                    }
-                }
-            }
-
-            // Positive chamfer/rounding (inward)
-            if (cr1 != 0 && cr1 > 0) {
-                if (chamfer1 != undef || chamfer != undef) {
-                    polygon(points=[[rad - abs(cr1), 0], [rad, 0], [rad, abs(cr1)]], paths=[[0, 1, 2, 0]]);
-                } else if (rounding1 != undef || rounding != undef) {
+                polygon(points=[[0,0],[rad,0],[rad,h],[0,h]], paths=[[0,1,2,3,0]]);
+                if(cham1!=undef && cham1<0) {
+                    polygon(points=[[rad,0],[rad+abs(cham1),0],[rad,abs(cham1)]],paths=[[0,1,2,0]]);
+                } else {
+                if(rnd1!=undef && rnd1<0) {
                     difference() {
-                        translate([rad - abs(cr1), 0]) square(size=[abs(cr1), abs(cr1)]);
-                        translate([rad - abs(cr1), abs(cr1)]) circle(r=abs(cr1));
+                        translate([rad,0]) square(size=[abs(rnd1),abs(rnd1)]);
+                        translate([rad+abs(rnd1),abs(rnd1)])circle(r=abs(rnd1));
                     }
-                }
-            }
-            if (cr2 != 0 && cr2 > 0) {
-                if (chamfer2 != undef || chamfer != undef) {
-                    polygon(points=[[rad - abs(cr2), h], [rad, h], [rad, h - abs(cr2)]], paths=[[0, 1, 2, 0]]);
-                } else if (rounding2 != undef || rounding != undef) {
+                }}
+                if(cham2!=undef && cham2<0) {
+                    polygon(points=[[rad,h],[rad+abs(cham2),h],[rad,h-abs(cham2)]],paths=[[0,1,2,0]]);
+                } else {
+                if(rnd2!=undef && rnd2<0) {
                     difference() {
-                        translate([rad - abs(cr2), h - abs(cr2)]) square(size=[abs(cr2), abs(cr2)]);
-                        translate([rad - abs(cr2), h - abs(cr2)]) circle(r=abs(cr2));
+                        translate([rad,h-abs(rnd2)]) square(size=[abs(rnd2),abs(rnd2)]);
+                        translate([rad+abs(rnd2),h-abs(rnd2)])circle(r=abs(rnd2));
                     }
-                }
+                }}
             }
+            if(cham1!=undef && cham1>0) {
+                polygon(points=[[rad-abs(cham1),0],[rad,0],[rad,abs(cham1)]],paths=[[0,1,2,0]]);
+            } else {
+            if(rnd1!=undef && rnd1>0) {
+                difference() {
+                    translate([rad-abs(rnd1),0]) square(size=[abs(rnd1),abs(rnd1)]);
+                    translate([rad-abs(rnd1),abs(rnd1)]) circle(r=abs(rnd1));
+                }
+            }}
+            if(cham2!=undef && cham2>0) {
+                polygon(points=[[rad-abs(cham2),h],[rad,h],[rad,h-abs(cham2)]],paths=[[0,1,2,0]]);
+            } else {
+            if(rnd2!=undef && rnd2>0) {
+                difference() {
+                    translate([rad-abs(rnd2),h-abs(rnd2)]) square(size=[abs(rnd2),abs(rnd2)]);
+                    translate([rad-abs(rnd2),h-abs(rnd2)]) circle(r=abs(rnd2));
+                }
+            }}
         }
     }
 }
 
-module roundedCube(size=undef, edgeRadius=0, chamfer=undef, chamfer1=undef, chamfer2=undef, rounding=undef, rounding1=undef, rounding2=undef) {
-    // Resolve chamfer and rounding for bottom and top
-    cr1 = chamfer1 != undef ? chamfer1 : chamfer != undef ? chamfer : rounding1 != undef ? rounding1 : rounding != undef ? rounding : 0;
-    cr2 = chamfer2 != undef ? chamfer2 : chamfer != undef ? chamfer : rounding2 != undef ? rounding2 : rounding != undef ? rounding : 0;
+// this roundedCube has is sized with X,Y,Z dimensions specified in 'size', centered at X,Y=0,0, bottom at Z=0 and extending to positive Z axis direction
+// the 4 vertical edges can be rounded by edgeRadius
+// the bottom edges can be rounded or chamfered (positive or negative values)
+// the top edges can be rounded or chamfered (positive or negative values) 
+module roundedCube(size=undef,edgeRadius=0,chamfer=undef,chamfer1=undef,chamfer2=undef,rounding=undef,rounding1=undef,rounding2=undef) {
+// many other asserts should be added here
 
-    // Assert chamfer/rounding does not exceed edge radius
-    assert(edgeRadius >= abs(cr1), "Error: chamfer/rounding can't exceed edge radius");
-    assert(edgeRadius >= abs(cr2), "Error: chamfer/rounding can't exceed edge radius");
 
-    // Calculate heights for blocks
-    heightLowerBlock = cr1 > 0 ? abs(cr1) : 0;
-    heightUpperBlock = cr2 > 0 ? abs(cr2) : 0;
-    heightCenterBlock = size.z - heightLowerBlock - heightUpperBlock;
+cham1=(chamfer1!=undef)?chamfer1:(chamfer!=undef)?chamfer:undef;
+rnd1=(rounding1!=undef)?rounding1:(rounding!=undef)?rounding:undef;
 
+cham2=(chamfer2!=undef)?chamfer2:(chamfer!=undef)?chamfer:undef;
+rnd2=(rounding2!=undef)?rounding2:(rounding!=undef)?rounding:undef;
+
+cr1 = (cham1!=undef)?cham1:(rnd1!=undef)?rnd1:0;
+cr2 = (cham2!=undef)?cham2:(rnd2!=undef)?rnd2:0;
+
+cr1Reduce = (cr1<0)?0:abs(cr1);
+cr2Reduce = (cr2<0)?0:abs(cr2);
+
+assert(edgeRadius>=abs(cr1),"Error: chamfer/rounding can't exceed edge radius");
+assert(edgeRadius>=abs(cr2),"Error: chamfer/rounding can't exceed edge radius");
+
+heightUpperBlock = (cr2>0)?abs(cr2):0;
+heightLowerBlock = (cr1>0)?abs(cr1):0;
+heightCenterBlock= size.z-heightUpperBlock-heightLowerBlock;
+
+echo("CRS=",cr1,cr2);
+echo("Block Heights=",heightLowerBlock,heightCenterBlock,heightUpperBlock);
     render() {
-        union() {
-            // Rounded cylinders at cube corners
-            for (x = [-1, 1], y = [-1, 1]) {
-                translate([x * (size.x / 2 - edgeRadius), y * (size.y / 2 - edgeRadius), 0])
-                    roundedCylinder(r=edgeRadius, h=size.z, chamfer1=chamfer1, chamfer2=chamfer2, rounding1=rounding1, rounding2=rounding2);
-            }
+    union() {
+        translate([(size.x/2-edgeRadius),(size.y/2-edgeRadius),0])roundedCylinder(r=edgeRadius,h=size.z,chamfer1=cham1,chamfer2=cham2,rounding1=rnd1,rounding2=rnd2);
+        translate([(size.x/2-edgeRadius),-(size.y/2-edgeRadius),0])roundedCylinder(r=edgeRadius,h=size.z,chamfer1=cham1,chamfer2=cham2,rounding1=rnd1,rounding2=rnd2);
+        translate([-(size.x/2-edgeRadius),(size.y/2-edgeRadius),0])roundedCylinder(r=edgeRadius,h=size.z,chamfer1=cham1,chamfer2=cham2,rounding1=rnd1,rounding2=rnd2);
+        translate([-(size.x/2-edgeRadius),-(size.y/2-edgeRadius),0])roundedCylinder(r=edgeRadius,h=size.z,chamfer1=cham1,chamfer2=cham2,rounding1=rnd1,rounding2=rnd2);
 
-            // Lower block (bottom chamfer/rounding)
-            if (heightLowerBlock > 0) {
-                translate([0, 0, heightLowerBlock / 2]) {
-                    cube(size=[size.x - 2 * abs(cr1), size.y - 2 * edgeRadius, heightLowerBlock], center=true);
-                    cube(size=[size.x - 2 * edgeRadius, size.y - 2 * abs(cr1), heightLowerBlock], center=true);
-                }
-            }
+        if(heightLowerBlock>0) {
+            translate([0,0,heightLowerBlock/2]) cube(size=[size.x-2*abs(cr1),size.y-2*edgeRadius,heightLowerBlock],center=true);
+            translate([0,0,heightLowerBlock/2]) cube(size=[size.x-2*edgeRadius,size.y-2*abs(cr1),heightLowerBlock],center=true);
+        }
+        if(heightCenterBlock>0) {
+            translate([0,0,heightCenterBlock/2+heightLowerBlock]) cube(size=[size.x,size.y-2*edgeRadius,heightCenterBlock],center=true);
+            translate([0,0,heightCenterBlock/2+heightLowerBlock]) cube(size=[size.x-2*edgeRadius,size.y,heightCenterBlock],center=true);
+        }
+        if(heightUpperBlock>0) {
+            translate([0,0,heightUpperBlock/2+heightCenterBlock+heightLowerBlock]) cube(size=[size.x-2*abs(cr2),size.y-2*edgeRadius,heightUpperBlock],center=true);
+            translate([0,0,heightUpperBlock/2+heightCenterBlock+heightLowerBlock]) cube(size=[size.x-2*edgeRadius,size.y-2*abs(cr2),heightUpperBlock],center=true);
+        }
+        if(cr1!=0) {
+            translate([0,-(size.y/2-(cr1>0?abs(cr1):0)),0]) edgeRoundedOrChamfered(l=size.x-2*edgeRadius,chamfer=cham1,rounding=rnd1);
+            translate([0,(size.y/2-(cr1>0?abs(cr1):0)),0]) rotate([0,0,180]) edgeRoundedOrChamfered(l=size.x-2*edgeRadius,chamfer=cham1,rounding=rnd1);
+            translate([(size.x/2-(cr1>0?abs(cr1):0)),0,0]) rotate([0,0,90]) edgeRoundedOrChamfered(l=size.y-2*edgeRadius,chamfer=cham1,rounding=rnd1);
+            translate([-(size.x/2-(cr1>0?abs(cr1):0)),0,0]) rotate([0,0,270]) edgeRoundedOrChamfered(l=size.y-2*edgeRadius,chamfer=cham1,rounding=rnd1);
+        }
+        if(cr2!=0) {
+            translate([0,(size.y/2-(cr2>0?abs(cr2):0)),size.z]) rotate([180,0,0]) edgeRoundedOrChamfered(l=size.x-2*edgeRadius,chamfer=cham2,rounding=rnd2);
+            translate([0,-(size.y/2-(cr2>0?abs(cr2):0)),size.z]) rotate([180,0,180]) edgeRoundedOrChamfered(l=size.x-2*edgeRadius,chamfer=cham2,rounding=rnd2);
+            translate([-(size.x/2-(cr2>0?abs(cr2):0)),0,size.z]) rotate([180,0,90]) edgeRoundedOrChamfered(l=size.y-2*edgeRadius,chamfer=cham2,rounding=rnd2);
+            translate([(size.x/2-(cr2>0?abs(cr2):0)),0,size.z]) rotate([180,0,270]) edgeRoundedOrChamfered(l=size.y-2*edgeRadius,chamfer=cham2,rounding=rnd2);
+        }
+    }}
+}
 
-            // Center block
-            if (heightCenterBlock > 0) {
-                translate([0, 0, heightCenterBlock / 2 + heightLowerBlock]) {
-                    cube(size=[size.x, size.y - 2 * edgeRadius, heightCenterBlock], center=true);
-                    cube(size=[size.x - 2 * edgeRadius, size.y, heightCenterBlock], center=true);
-                }
-            }
+// this is used to provide rounding or chamfering geometries for the roundedCube
+module edgeRoundedOrChamfered(l,chamfer=undef,rounding=undef) {
+// many other asserts should be added here
 
-            // Upper block (top chamfer/rounding)
-            if (heightUpperBlock > 0) {
-                translate([0, 0, heightUpperBlock / 2 + heightCenterBlock + heightLowerBlock]) {
-                    cube(size=[size.x - 2 * abs(cr2), size.y - 2 * edgeRadius, heightUpperBlock], center=true);
-                    cube(size=[size.x - 2 * edgeRadius, size.y - 2 * abs(cr2), heightUpperBlock], center=true);
-                }
-            }
+dim = (chamfer!=undef)?chamfer:(rounding!=undef)?rounding:undef;
+assert(dim!=undef,"Error: Chamfer or Rounding must be specified");
 
-            // Bottom edge rounding/chamfering
-            if (cr1 != 0) {
-                for (i = [0:3]) {
-                    translate([
-                        i % 2 == 0 ? 0 : (i == 1 ? 1 : -1) * (size.x / 2 - (cr1 > 0 ? abs(cr1) : 0)),
-                        i % 2 == 1 ? 0 : (i == 0 ? 1 : -1) * (size.y / 2 - (cr1 > 0 ? abs(cr1) : 0)),
-                        0
-                    ])
-                    rotate([0, 0, 90 * i])
-                        edgeRoundedOrChamfered(l=(i % 2 == 0 ? size.x : size.y) - 2 * edgeRadius, chamfer=chamfer1, rounding=rounding1);
-                }
+    if(dim<0) {
+        difference() {
+            translate([0,-abs(dim)/2,abs(dim)/2]) cube(size=[l,abs(dim),abs(dim)],center=true);
+            if(chamfer!=undef) {
+                translate([0,-abs(dim),abs(dim)]) rotate([45,0,0]) cube(size=[l+.02,abs(dim)*sqrt(2),abs(dim)*sqrt(2)],center=true);
+            } else {
+                translate([0,-abs(dim),abs(dim)]) rotate([0,90,0]) cylinder(r=abs(dim),h=l+.02,center=true);
             }
-
-            // Top edge rounding/chamfering
-            if (cr2 != 0) {
-                for (i = [0:3]) {
-                    translate([
-                        i % 2 == 0 ? 0 : (i == 1 ? -1 : 1) * (size.x / 2 - (cr2 > 0 ? abs(cr2) : 0)),
-                        i % 2 == 1 ? 0 : (i == 0 ? 1 : -1) * (size.y / 2 - (cr2 > 0 ? abs(cr2) : 0)),
-                        size.z
-                    ])
-                    rotate([180, 0, 90 * i])
-                        edgeRoundedOrChamfered(l=(i % 2 == 0 ? size.x : size.y) - 2 * edgeRadius, chamfer=chamfer2, rounding=rounding2);
-                }
+        }
+    } else {
+        intersection() {
+            translate([0,-abs(dim)/2,abs(dim)/2]) cube(size=[l,abs(dim),abs(dim)],center=true);
+            if(chamfer!=undef) {
+                translate([0,0,abs(dim)]) rotate([45,0,0]) cube(size=[l+.02,abs(dim)*sqrt(2),abs(dim)*sqrt(2)],center=true);
+            } else {
+                translate([0,0,abs(dim)]) rotate([0,90,0]) cylinder(r=abs(dim),h=l+.02,center=true);
             }
         }
     }
 }
+
+    
 
 module roundedHex(f=undef, h=undef, edgeRadius=0, chamfer=undef, chamfer1=undef, chamfer2=undef, rounding=undef, rounding1=undef, rounding2=undef) {
     // Resolve chamfer and rounding for bottom and top
     cr1 = chamfer1 != undef ? chamfer1 : chamfer != undef ? chamfer : rounding1 != undef ? rounding1 : rounding != undef ? rounding : 0;
     cr2 = chamfer2 != undef ? chamfer2 : chamfer != undef ? chamfer : rounding2 != undef ? rounding2 : rounding != undef ? rounding : 0;
+
+    c1 = (chamfer1 != undef)?chamfer1:chamfer;
+    c2 = (chamfer2 != undef)?chamfer2:chamfer;
+    r1 = (rounding1 != undef)?rounding1:rounding;
+    r2 = (rounding2 != undef)?rounding2:rounding;
 
     // Calculate heights for blocks
     heightLowerBlock = cr1 > 0 ? abs(cr1) : 0;
@@ -697,7 +718,7 @@ module roundedHex(f=undef, h=undef, edgeRadius=0, chamfer=undef, chamfer1=undef,
         if (edgeRadius > 0 || cr1 != 0 || cr2 != 0) {
             for (i = [0:5]) {
                 rotate([0, 0, 30 + 60 * i]) translate([rMid, 0, 0])
-                    roundedCylinder(r=edgeRadius, h=h, chamfer1=chamfer1, chamfer2=chamfer2, rounding1=rounding1, rounding2=rounding2);
+                    roundedCylinder(r=edgeRadius, h=h, chamfer1=c1, chamfer2=c2, rounding1=r1, rounding2=r2);
             }
         }
 
@@ -729,7 +750,7 @@ module roundedHex(f=undef, h=undef, edgeRadius=0, chamfer=undef, chamfer1=undef,
         if (cr1 != 0) {
             for (i = [0:5]) {
                 rotate([0, 0, 60 * i]) translate([-(f / 2 - (cr1 > 0 ? abs(cr1) : 0)), 0, 0]) rotate([0, 0, -90])
-                    edgeRoundedOrChamfered(l=rMid * (f - cr1) / f, chamfer=chamfer1, rounding=rounding1);
+                    edgeRoundedOrChamfered(l=rMid * (f - cr1) / f, chamfer=c1, rounding=r1);
             }
         }
 
@@ -737,39 +758,10 @@ module roundedHex(f=undef, h=undef, edgeRadius=0, chamfer=undef, chamfer1=undef,
         if (cr2 != 0) {
             for (i = [0:5]) {
                 rotate([0, 0, 60 * i]) translate([(f / 2 - (cr2 > 0 ? abs(cr2) : 0)), 0, h]) rotate([180, 0, -90])
-                    edgeRoundedOrChamfered(l=rMid * (f - cr2) / f, chamfer=chamfer2, rounding=rounding2);
+                    edgeRoundedOrChamfered(l=rMid * (f - cr2) / f, chamfer=c2, rounding=r2);
             }
         }
     }
 }
 
 
-// this is used to provide rounding or chamfering geometries for the roundedCube
-module edgeRoundedOrChamfered(l,chamfer=undef,rounding=undef) {
-// many other asserts should be added here
-
-dim = (chamfer!=undef)?chamfer:(rounding!=undef)?rounding:undef;
-assert(dim!=undef,"Error: Chamfer or Rounding must be specified");
-
-    if(dim<0) {
-        difference() {
-            translate([0,-abs(dim)/2,abs(dim)/2]) cube(size=[l,abs(dim),abs(dim)],center=true);
-            if(chamfer!=undef) {
-                translate([0,-abs(dim),abs(dim)]) rotate([45,0,0]) cube(size=[l+.02,abs(dim)*sqrt(2),abs(dim)*sqrt(2)],center=true);
-            } else {
-                translate([0,-abs(dim),abs(dim)]) rotate([0,90,0]) cylinder(r=abs(dim),h=l+.02,center=true);
-            }
-        }
-    } else {
-        intersection() {
-            translate([0,-abs(dim)/2,abs(dim)/2]) cube(size=[l,abs(dim),abs(dim)],center=true);
-            if(chamfer!=undef) {
-                translate([0,0,abs(dim)]) rotate([45,0,0]) cube(size=[l+.02,abs(dim)*sqrt(2),abs(dim)*sqrt(2)],center=true);
-            } else {
-                translate([0,0,abs(dim)]) rotate([0,90,0]) cylinder(r=abs(dim),h=l+.02,center=true);
-            }
-        }
-    }
-}
-
-    
